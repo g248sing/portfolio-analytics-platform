@@ -16,5 +16,36 @@ services:
       timeout: 5s
       retries: 10
 
+  api:
+    build:
+      context: .
+      dockerfile: src/Portfolio.Api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-portfolio};Username=${POSTGRES_USER:-portfolio};Password=${POSTGRES_PASSWORD:-portfolio}"
+      Jwt__Issuer: "PortfolioAnalytics"
+      Jwt__Audience: "PortfolioAnalytics"
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:-i4HLVA0I70Drq8FROOubG_MaMoJpYzBHuRt0OhscWt9fIg4XFtk6kd-vNgqTPWHj}
+      AlphaVantage__ApiKey: ${ALPHA_VANTAGE_API_KEY:-REPLACE_WITH_YOUR_ALPHA_VANTAGE_KEY}
+      Cors__AllowedOrigins__0: ${FRONTEND_ORIGIN:-http://localhost:8081}
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+    ports:
+      - "8080:8080"
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "8081:80"
+
 volumes:
   postgres-data:
