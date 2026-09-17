@@ -25,6 +25,8 @@ public class PortfolioDbContext(DbContextOptions<PortfolioDbContext> options)
 
     public DbSet<PriceRefreshLog> PriceRefreshLogs => Set<PriceRefreshLog>();
 
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
