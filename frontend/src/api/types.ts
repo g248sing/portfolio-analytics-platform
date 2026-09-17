@@ -69,3 +69,9 @@ export interface PerformersResponseDto {
   top: PerformerEntryDto[]
   bottom: PerformerEntryDto[]
 }
+
+export interface TickerEntryDto {
+  symbol: string
+  latestClose: number
+  changePercent: number | null
+}

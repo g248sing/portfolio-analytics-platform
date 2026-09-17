@@ -89,6 +89,7 @@ builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<IHoldingsService, HoldingsService>();
 builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
 builder.Services.AddScoped<IExportService, ExportService>();
+builder.Services.AddScoped<ITickerFeedService, TickerFeedService>();
 
 builder.Services.Configure<AlphaVantageOptions>(builder.Configuration.GetSection(AlphaVantageOptions.SectionName));
 builder.Services.AddHttpClient<IMarketDataClient, AlphaVantageClient>((serviceProvider, client) =>
