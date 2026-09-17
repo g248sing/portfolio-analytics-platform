@@ -4,6 +4,11 @@ A full-stack investment portfolio tracker: an ASP.NET Core API with a FIFO cost-
 engine, a scheduled job that pulls daily prices from Alpha Vantage, and a React
 dashboard with charts and CSV/Excel export.
 
+**Live:** [portfolio-analytics-web.onrender.com](https://portfolio-analytics-web.onrender.com)
+(API at [portfolio-analytics-api-e9mi.onrender.com](https://portfolio-analytics-api-e9mi.onrender.com))
+— hosted on Render's free tier, so the first request after a period of inactivity can take
+30-60s to wake up.
+
 ## Stack
 
 - **API:** ASP.NET Core 10, EF Core + Npgsql, ASP.NET Core Identity + JWT auth, Quartz.NET
@@ -77,13 +82,13 @@ provision them in one step instead of clicking through the dashboard twice.
 Free-tier caveats worth knowing going in: Render's free web services spin down after 15
 minutes of no traffic (the next request wakes it back up, taking 30-60s), and Neon's free
 compute similarly suspends after a few minutes of inactivity. Fine for a portfolio/demo
-project; not something you'd want for anything latency-sensitive. Also: platform free-tier
-terms change, and so does the exact `render.yaml` field syntax (`runtime: docker` below is
-current as of when this was written but Render has renamed these fields before) — this
-config was written from documentation, not verified against a real Render account, so if
-the Blueprint step rejects a field name, check
-[Render's Blueprint spec](https://render.com/docs/blueprint-spec) for the current name and
-let me know so I can fix it here too.
+project; not something you'd want for anything latency-sensitive.
+
+This has been run end-to-end against real Neon and Render accounts (this repo's own live
+deployment above uses exactly these steps), so the `render.yaml` field names below are
+confirmed working as of when this was deployed — not just written from documentation. If
+Render changes its Blueprint spec later and a field gets rejected, check
+[Render's Blueprint spec](https://render.com/docs/blueprint-spec) for the current name.
 
 ### 1. Create the Neon database
 
@@ -106,12 +111,18 @@ let me know so I can fix it here too.
    - **API service** — `ConnectionStrings__Default` (from step 1), `Jwt__SigningKey`
      (generate one: `openssl rand -base64 48`, don't reuse the dev key committed in this
      repo), `AlphaVantage__ApiKey`, and `Cors__AllowedOrigins__0` (the frontend service's
-     URL — Render shows you the assigned `https://portfolio-analytics-web.onrender.com`-style
-     URL before you finish, or you can add this one after both services exist)
-   - **Frontend service** — `VITE_API_BASE_URL` set to the API service's URL + `/api`
-     (e.g. `https://portfolio-analytics-api.onrender.com/api`) — this is baked in at build
-     time, so if you ever change the API's URL you need to redeploy the frontend, not just
-     the API
+     URL — Render shows you the assigned URL before you finish, or you can add this one
+     after both services exist)
+   - **Frontend service** — `VITE_API_BASE_URL` set to the API service's URL + `/api` —
+     this is baked in at build time, so if you ever change the API's URL you need to
+     redeploy the frontend, not just the API
+
+   **Render subdomains are global across every Render account, not per-account** — if the
+   exact name in `render.yaml` (e.g. `portfolio-analytics-api`) is already taken by anyone
+   else's project, Render silently assigns yours a different one (ours ended up as
+   `portfolio-analytics-api-e9mi.onrender.com`). Always check each service's actual URL in
+   the dashboard after creation — don't assume it matches the name in `render.yaml` — and
+   use the real one for `Cors__AllowedOrigins__0` / `VITE_API_BASE_URL`.
 4. Both services in `render.yaml` are set `autoDeploy: false` — Render won't redeploy on
    every push by itself. Deploys are meant to be triggered by `cd.yml` after tests pass
    (step 4 below), not directly by Render watching the branch.

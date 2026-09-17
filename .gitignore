@@ -14,8 +14,10 @@ frontend/coverage/
 .env.*
 !.env.example
 
-# Claude Code local settings
+# Claude Code local settings (kept locally so Claude Code still picks it up
+# as project instructions, but not shown in the public repo)
 .claude/
+CLAUDE.md
 
 # Editors / OS
 .vscode/
