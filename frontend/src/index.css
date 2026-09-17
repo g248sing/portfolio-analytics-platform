@@ -69,6 +69,70 @@ body {
   background-attachment: fixed;
 }
 
+/* --- Ticker-tape background texture --- */
+.ticker-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  padding-block: 8vh;
+  opacity: 0.4;
+  -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 15%, black 15%, transparent 70%);
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 15%, black 15%, transparent 70%);
+}
+
+@media (prefers-color-scheme: light) {
+  .ticker-bg {
+    opacity: 0.5;
+  }
+}
+
+.ticker-row {
+  display: flex;
+  width: max-content;
+  gap: 56px;
+  font-family: var(--mono);
+  font-size: 15px;
+  white-space: nowrap;
+  animation: ticker-scroll linear infinite;
+}
+
+@keyframes ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.ticker-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--text-dim);
+}
+
+.ticker-symbol {
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.ticker-item .positive,
+.ticker-item .negative {
+  font-weight: 500;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-row {
+    animation: none;
+  }
+}
+
 h1,
 h2,
 h3 {
