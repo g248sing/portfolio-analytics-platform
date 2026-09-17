@@ -22,6 +22,7 @@ public class HoldingsService(PortfolioDbContext db) : IHoldingsService
                 l.Security.Symbol,
                 l.Security.Name,
                 l.Security.Sector,
+                l.Security.AssetClass,
                 l.RemainingQuantity,
                 l.CostBasisPerUnit,
             })
@@ -40,7 +41,7 @@ public class HoldingsService(PortfolioDbContext db) : IHoldingsService
             .ToDictionaryAsync(dp => dp.SecurityId, dp => dp.Close, cancellationToken);
 
         var holdings = lots
-            .GroupBy(l => new { l.SecurityId, l.Symbol, l.Name, l.Sector })
+            .GroupBy(l => new { l.SecurityId, l.Symbol, l.Name, l.Sector, l.AssetClass })
             .Select(g =>
             {
                 var quantity = g.Sum(l => l.RemainingQuantity);
@@ -57,6 +58,7 @@ public class HoldingsService(PortfolioDbContext db) : IHoldingsService
                     g.Key.Symbol,
                     g.Key.Name,
                     g.Key.Sector,
+                    g.Key.AssetClass,
                     quantity,
                     averageCostBasisPerUnit,
                     totalCostBasis,

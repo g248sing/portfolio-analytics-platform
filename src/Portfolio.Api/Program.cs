@@ -8,13 +8,17 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Portfolio.Api.Filters;
 using Portfolio.Api.Middleware;
+using Portfolio.Application.Analytics;
 using Portfolio.Application.Auth;
 using Portfolio.Application.Auth.Validators;
+using Portfolio.Application.Export;
 using Portfolio.Application.Holdings;
 using Portfolio.Application.MarketData;
 using Portfolio.Application.Portfolios;
 using Portfolio.Application.Transactions;
+using Portfolio.Infrastructure.Analytics;
 using Portfolio.Infrastructure.Auth;
+using Portfolio.Infrastructure.Export;
 using Portfolio.Infrastructure.Holdings;
 using Portfolio.Infrastructure.Identity;
 using Portfolio.Infrastructure.Jobs;
@@ -82,6 +86,8 @@ builder.Services.AddSingleton<ITokenService, JwtTokenService>();
 builder.Services.AddScoped<IPortfolioService, PortfolioService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<IHoldingsService, HoldingsService>();
+builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
+builder.Services.AddScoped<IExportService, ExportService>();
 
 builder.Services.Configure<AlphaVantageOptions>(builder.Configuration.GetSection(AlphaVantageOptions.SectionName));
 var alphaVantageOptions = builder.Configuration.GetSection(AlphaVantageOptions.SectionName).Get<AlphaVantageOptions>()
