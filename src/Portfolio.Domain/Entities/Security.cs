@@ -18,6 +18,10 @@ public class Security
 
     public DateTimeOffset? MetadataRefreshedAt { get; set; }
 
+    // Drives oldest-refreshed-first prioritization when the daily price job
+    // has more symbols than its API quota can cover in one run.
+    public DateTimeOffset? LastPriceRefreshAttemptAt { get; set; }
+
     public ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();
 
     public ICollection<Lot> Lots { get; set; } = new List<Lot>();

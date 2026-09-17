@@ -11,14 +11,18 @@ using Portfolio.Api.Middleware;
 using Portfolio.Application.Auth;
 using Portfolio.Application.Auth.Validators;
 using Portfolio.Application.Holdings;
+using Portfolio.Application.MarketData;
 using Portfolio.Application.Portfolios;
 using Portfolio.Application.Transactions;
 using Portfolio.Infrastructure.Auth;
 using Portfolio.Infrastructure.Holdings;
 using Portfolio.Infrastructure.Identity;
+using Portfolio.Infrastructure.Jobs;
+using Portfolio.Infrastructure.MarketData;
 using Portfolio.Infrastructure.Persistence;
 using Portfolio.Infrastructure.Portfolios;
 using Portfolio.Infrastructure.Transactions;
+using Quartz;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -78,6 +82,26 @@ builder.Services.AddSingleton<ITokenService, JwtTokenService>();
 builder.Services.AddScoped<IPortfolioService, PortfolioService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<IHoldingsService, HoldingsService>();
+
+builder.Services.Configure<AlphaVantageOptions>(builder.Configuration.GetSection(AlphaVantageOptions.SectionName));
+var alphaVantageOptions = builder.Configuration.GetSection(AlphaVantageOptions.SectionName).Get<AlphaVantageOptions>()
+    ?? throw new InvalidOperationException("AlphaVantage configuration section is missing.");
+builder.Services.AddHttpClient<IMarketDataClient, AlphaVantageClient>(client =>
+{
+    client.BaseAddress = new Uri(alphaVantageOptions.BaseUrl);
+});
+builder.Services.AddScoped<PortfolioSnapshotService>();
+
+builder.Services.AddQuartz(q =>
+{
+    var priceRefreshJobKey = new JobKey(nameof(PriceRefreshJob));
+    q.AddJob<PriceRefreshJob>(opts => opts.WithIdentity(priceRefreshJobKey));
+    q.AddTrigger(opts => opts
+        .ForJob(priceRefreshJobKey)
+        .WithIdentity($"{nameof(PriceRefreshJob)}-trigger")
+        .WithCronSchedule("0 0 6 * * ?")); // Daily at 06:00 UTC.
+});
+builder.Services.AddQuartzHostedService(opts => opts.WaitForJobsToComplete = true);
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("Jwt configuration section is missing.");
