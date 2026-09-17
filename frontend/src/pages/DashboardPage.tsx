@@ -1,4 +1,5 @@
 import { AllocationCharts } from '../components/AllocationCharts'
+import { HeroStat } from '../components/HeroStat'
 import { HoldingsTable } from '../components/HoldingsTable'
 import { PerformersTable } from '../components/PerformersTable'
 import { PortfolioSelector } from '../components/PortfolioSelector'
@@ -14,6 +15,8 @@ export function DashboardPage() {
 
       {portfolioId && (
         <>
+          <HeroStat portfolioId={portfolioId} />
+
           <section className="card">
             <h3>Portfolio Value Over Time</h3>
             <ValueHistoryChart portfolioId={portfolioId} />

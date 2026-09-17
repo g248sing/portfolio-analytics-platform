@@ -25,25 +25,27 @@ export function RegisterPage() {
   }
 
   return (
-    <main>
-      <h1>Create an account</h1>
-      <form onSubmit={handleSubmit}>
-        <label>
-          Email
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        </label>
-        <label>
-          Password
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-        </label>
-        {error && <p role="alert">{error}</p>}
-        <button type="submit" disabled={submitting}>
-          Register
-        </button>
-      </form>
-      <p>
-        Already have an account? <Link to="/login">Log in</Link>
-      </p>
-    </main>
+    <div className="auth-shell">
+      <div className="auth-card">
+        <h1>Open a ledger</h1>
+        <form onSubmit={handleSubmit}>
+          <label>
+            Email
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+          </label>
+          <label>
+            Password
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </label>
+          {error && <p role="alert">{error}</p>}
+          <button type="submit" disabled={submitting}>
+            {submitting ? 'Creating...' : 'Register'}
+          </button>
+        </form>
+        <p>
+          Already have an account? <Link to="/login">Log in</Link>
+        </p>
+      </div>
+    </div>
   )
 }

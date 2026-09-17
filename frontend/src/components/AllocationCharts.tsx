@@ -3,7 +3,15 @@ import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recha
 import { getAllocation } from '../api/analyticsApi'
 import type { AllocationSliceDto } from '../api/types'
 
-const COLORS = ['#2563eb', '#16a34a', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#be185d', '#65a30d']
+const COLORS = ['#ffb020', '#2dd9c4', '#ff8f4d', '#6ee7d0', '#d4a05a', '#7fa8c9', '#c77d5c', '#9d8fd4']
+
+const tooltipStyle = {
+  background: 'var(--bg-elevated)',
+  border: '1px solid var(--border-bright)',
+  borderRadius: 2,
+  fontFamily: 'var(--mono)',
+  fontSize: 12,
+}
 
 function PieCard({ title, slices }: { title: string; slices: AllocationSliceDto[] }) {
   return (
@@ -20,13 +28,15 @@ function PieCard({ title, slices }: { title: string; slices: AllocationSliceDto[
               nameKey="label"
               outerRadius={90}
               label={(entry: { name?: string; percent?: number }) => `${entry.name} (${((entry.percent ?? 0) * 100).toFixed(0)}%)`}
+              labelLine={{ stroke: 'var(--border-bright)' }}
+              stroke="var(--bg-elevated)"
             >
               {slices.map((slice, index) => (
                 <Cell key={slice.label} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip formatter={(value) => Number(value).toLocaleString('en-US', { style: 'currency', currency: 'USD' })} />
-            <Legend />
+            <Tooltip contentStyle={tooltipStyle} formatter={(value) => Number(value).toLocaleString('en-US', { style: 'currency', currency: 'USD' })} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
           </PieChart>
         </ResponsiveContainer>
       )}

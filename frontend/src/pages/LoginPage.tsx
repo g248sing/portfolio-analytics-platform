@@ -25,25 +25,27 @@ export function LoginPage() {
   }
 
   return (
-    <main>
-      <h1>Log in</h1>
-      <form onSubmit={handleSubmit}>
-        <label>
-          Email
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        </label>
-        <label>
-          Password
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-        </label>
-        {error && <p role="alert">{error}</p>}
-        <button type="submit" disabled={submitting}>
-          Log in
-        </button>
-      </form>
-      <p>
-        No account? <Link to="/register">Register</Link>
-      </p>
-    </main>
+    <div className="auth-shell">
+      <div className="auth-card">
+        <h1>Welcome back</h1>
+        <form onSubmit={handleSubmit}>
+          <label>
+            Email
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+          </label>
+          <label>
+            Password
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </label>
+          {error && <p role="alert">{error}</p>}
+          <button type="submit" disabled={submitting}>
+            {submitting ? 'Signing in...' : 'Log in'}
+          </button>
+        </form>
+        <p>
+          No account? <Link to="/register">Register</Link>
+        </p>
+      </div>
+    </div>
   )
 }

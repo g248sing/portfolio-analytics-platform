@@ -13,6 +13,6 @@ describe('App', () => {
         </AuthProvider>
       </BrowserRouter>,
     )
-    expect(await screen.findByRole('heading', { name: /log in/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeInTheDocument()
   })
 })
