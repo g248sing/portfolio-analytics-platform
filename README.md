@@ -11,7 +11,7 @@ dashboard with charts and CSV/Excel export.
 - **Frontend:** React + TypeScript (Vite), TanStack Query, Recharts
 - **Market data:** [Alpha Vantage](https://www.alphavantage.co/) (free tier)
 - **Containers:** Docker, docker-compose for local dev
-- **CI/CD:** GitHub Actions → GHCR → Azure App Service for Containers
+- **CI/CD:** GitHub Actions → Render (API + frontend) + Neon (Postgres), free tier
 
 ## Repository layout
 
@@ -62,139 +62,82 @@ cd frontend && npm run lint && npm run test && npm run build
 
 - **CI** (`.github/workflows/ci.yml`): runs on every push/PR to `main` — backend build +
   unit + integration tests, frontend lint/test/build, and a Docker build validation pass.
-- **CD** (`.github/workflows/cd.yml`): runs on push to `main` — builds and pushes both
-  images to GHCR, then deploys to Azure App Service for Containers via OIDC (no stored
-  Azure secret). This needs one-time manual setup below.
+- **CD** (`.github/workflows/cd.yml`): runs on push to `main` — re-runs the full test suite,
+  and only if that passes, calls two Render deploy hooks (plain webhook URLs, no stored
+  cloud credential) to trigger the actual deploys. This needs the one-time manual setup below.
 
-## Deploying to Azure (one-time setup)
+## Deploying to Render + Neon (one-time setup, free)
 
-This deliberately isn't automated with Bicep/ARM yet — for a project built solo and
-incrementally, getting a manual deploy working first is the more honest v1 than IaC that's
-never been exercised. The commands below are what `cd.yml` assumes exists.
+Render has no native Postgres-as-a-service tier worth using here, so the database lives on
+Neon (serverless Postgres, generous free tier) while Render hosts the API (as the existing
+Docker image) and the frontend (as a static site, no container needed for that half).
+`render.yaml` in the repo root is a Render "Blueprint" — it describes both services so you
+provision them in one step instead of clicking through the dashboard twice.
 
-Prerequisites: an Azure subscription and the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli), logged in (`az login`).
+Free-tier caveats worth knowing going in: Render's free web services spin down after 15
+minutes of no traffic (the next request wakes it back up, taking 30-60s), and Neon's free
+compute similarly suspends after a few minutes of inactivity. Fine for a portfolio/demo
+project; not something you'd want for anything latency-sensitive. Also: platform free-tier
+terms change, and so does the exact `render.yaml` field syntax (`runtime: docker` below is
+current as of when this was written but Render has renamed these fields before) — this
+config was written from documentation, not verified against a real Render account, so if
+the Blueprint step rejects a field name, check
+[Render's Blueprint spec](https://render.com/docs/blueprint-spec) for the current name and
+let me know so I can fix it here too.
 
-### 1. Resource group and Postgres
+### 1. Create the Neon database
 
-```bash
-RG=portfolio-analytics-rg
-LOCATION=eastus
+1. Sign up at [neon.tech](https://neon.tech) (no credit card required for the free tier) and create a project.
+2. In the project dashboard, copy the connection string it gives you — it looks like
+   `postgresql://<user>:<password>@<endpoint>.neon.tech/<dbname>?sslmode=require`.
+3. Convert it to the ADO.NET format the API expects (same values, different syntax):
+   ```
+   Host=<endpoint>.neon.tech;Port=5432;Database=<dbname>;Username=<user>;Password=<password>;Ssl Mode=Require;Trust Server Certificate=true
+   ```
+   Use the **pooled** connection string Neon shows (not "direct") — it's the one meant for a normal running app.
 
-az group create --name $RG --location $LOCATION
+### 2. Deploy the Blueprint on Render
 
-az postgres flexible-server create \
-  --resource-group $RG \
-  --name portfolio-analytics-db \
-  --location $LOCATION \
-  --admin-user portfolioadmin \
-  --admin-password "<choose-a-strong-password>" \
-  --sku-name Standard_B1ms \
-  --tier Burstable \
-  --storage-size 32 \
-  --version 16 \
-  --public-access 0.0.0.0-255.255.255.255   # tighten this to App Service's outbound IPs afterward
+1. Sign up at [render.com](https://render.com) and connect your GitHub account.
+2. New → Blueprint → pick this repo. Render reads `render.yaml` and proposes two services:
+   `portfolio-analytics-api` (Docker web service) and `portfolio-analytics-web` (static site).
+3. Before the first deploy, it'll prompt for the env vars marked `sync: false` in
+   `render.yaml`. Fill in:
+   - **API service** — `ConnectionStrings__Default` (from step 1), `Jwt__SigningKey`
+     (generate one: `openssl rand -base64 48`, don't reuse the dev key committed in this
+     repo), `AlphaVantage__ApiKey`, and `Cors__AllowedOrigins__0` (the frontend service's
+     URL — Render shows you the assigned `https://portfolio-analytics-web.onrender.com`-style
+     URL before you finish, or you can add this one after both services exist)
+   - **Frontend service** — `VITE_API_BASE_URL` set to the API service's URL + `/api`
+     (e.g. `https://portfolio-analytics-api.onrender.com/api`) — this is baked in at build
+     time, so if you ever change the API's URL you need to redeploy the frontend, not just
+     the API
+4. Both services in `render.yaml` are set `autoDeploy: false` — Render won't redeploy on
+   every push by itself. Deploys are meant to be triggered by `cd.yml` after tests pass
+   (step 4 below), not directly by Render watching the branch.
 
-az postgres flexible-server db create \
-  --resource-group $RG \
-  --server-name portfolio-analytics-db \
-  --database-name portfolio
-```
+### 3. Grab the deploy hook URLs
 
-### 2. App Service plan and the two web apps
+For each service in the Render dashboard: Settings → Deploy Hook → copy the URL. These are
+bearer-token-in-the-URL webhooks — treat them as secrets.
 
-```bash
-az appservice plan create \
-  --resource-group $RG \
-  --name portfolio-analytics-plan \
-  --is-linux \
-  --sku B1
+### 4. GitHub repository configuration
 
-az webapp create \
-  --resource-group $RG \
-  --plan portfolio-analytics-plan \
-  --name portfolio-analytics-api \
-  --deployment-container-image-name mcr.microsoft.com/appsvc/staticsite:latest   # placeholder until first CD run
+Under **Settings → Secrets and variables → Actions → Secrets**, add:
 
-az webapp create \
-  --resource-group $RG \
-  --plan portfolio-analytics-plan \
-  --name portfolio-analytics-web \
-  --deployment-container-image-name mcr.microsoft.com/appsvc/staticsite:latest
-```
+| Name                     | Value                                    |
+|--------------------------|-------------------------------------------|
+| `RENDER_DEPLOY_HOOK_API` | the API service's deploy hook URL          |
+| `RENDER_DEPLOY_HOOK_WEB` | the frontend service's deploy hook URL     |
 
-Names must be globally unique — adjust `portfolio-analytics-*` if taken. Note the two
-hostnames (`https://portfolio-analytics-api.azurewebsites.net`, `...-web...`) — you'll need
-them below.
+### 5. Ship it
 
-### 3. App settings for the API
+Push to `main`. `cd.yml` runs the full test suite, and only on success, hits both deploy
+hooks — Render then pulls the latest commit and rebuilds each service itself (it builds the
+Docker image for the API and runs the static site build for the frontend; GitHub Actions
+never builds or pushes any image here, unlike a registry-based deploy).
 
-```bash
-az webapp config appsettings set \
-  --resource-group $RG \
-  --name portfolio-analytics-api \
-  --settings \
-    ConnectionStrings__Default="Host=portfolio-analytics-db.postgres.database.azure.com;Port=5432;Database=portfolio;Username=portfolioadmin;Password=<the-password-above>;SSL Mode=Require;Trust Server Certificate=true" \
-    Jwt__Issuer="PortfolioAnalytics" \
-    Jwt__Audience="PortfolioAnalytics" \
-    Jwt__SigningKey="<generate-a-real-random-secret>" \
-    AlphaVantage__ApiKey="<your-alpha-vantage-key>" \
-    Cors__AllowedOrigins__0="https://portfolio-analytics-web.azurewebsites.net" \
-    ASPNETCORE_ENVIRONMENT="Production" \
-    WEBSITES_PORT="8080"
-```
-
-Generate a real signing key rather than reusing the dev one committed in this repo, e.g.
-`openssl rand -base64 48`.
-
-### 4. Azure AD app registration for GitHub OIDC
-
-```bash
-APP_ID=$(az ad app create --display-name "portfolio-analytics-github-actions" --query appId -o tsv)
-az ad sp create --id $APP_ID
-
-SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-az role assignment create \
-  --assignee $APP_ID \
-  --role Contributor \
-  --scope /subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RG
-
-az ad app federated-credential create \
-  --id $APP_ID \
-  --parameters '{
-    "name": "github-main-branch",
-    "issuer": "https://token.actions.githubusercontent.com",
-    "subject": "repo:<your-github-org-or-user>/<your-repo>:ref:refs/heads/main",
-    "audiences": ["api://AzureADTokenExchange"]
-  }'
-```
-
-### 5. GitHub repository configuration
-
-Under **Settings → Secrets and variables → Actions**:
-
-| Type     | Name                     | Value                                                    |
-|----------|--------------------------|-----------------------------------------------------------|
-| Secret   | `AZURE_CLIENT_ID`        | `$APP_ID` from step 4                                     |
-| Secret   | `AZURE_TENANT_ID`        | `az account show --query tenantId -o tsv`                 |
-| Secret   | `AZURE_SUBSCRIPTION_ID`  | `$SUBSCRIPTION_ID` from step 4                             |
-| Variable | `AZURE_API_APP_NAME`     | `portfolio-analytics-api`                                  |
-| Variable | `AZURE_WEB_APP_NAME`     | `portfolio-analytics-web`                                  |
-| Variable | `API_PUBLIC_URL`         | `https://portfolio-analytics-api.azurewebsites.net`        |
-
-### 6. Make the GHCR images pullable
-
-The first `cd.yml` run pushes `ghcr.io/<org>/<repo>-api` and `-web` as **private** packages
-by default, and App Service can't pull a private GHCR image without credentials. Either:
-
-- Simplest: after the first CD run, go to the package's GitHub page → Package settings →
-  change visibility to **public**, or
-- More locked-down: `az webapp config container set --docker-registry-server-url https://ghcr.io --docker-registry-server-user <gh-username> --docker-registry-server-password <a GitHub PAT with read:packages>` on both web apps.
-
-### 7. Ship it
-
-Push to `main`. `cd.yml` builds and pushes both images, then redeploys both Web Apps to
-the new image tags. Watch the Actions tab, then hit the web app's URL.
-
-**Known gap:** migrations still run automatically on API container startup (same as
-local/CI), which is fine for this project's single-instance scale but would need a
-proper migration-as-a-separate-step approach before running multiple API replicas.
+**Known gaps:** migrations still run automatically on API startup (fine at this scale, not
+fine with multiple replicas — moot here since Render's free tier is single-instance anyway);
+and cold starts mean the first request after idle time will be slow on both the API and the
+database — don't be alarmed if a demo link takes a few seconds to wake up.

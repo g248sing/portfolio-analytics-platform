@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: portfolio-analytics-api
+    runtime: docker
+    plan: free
+    dockerfilePath: src/Portfolio.Api/Dockerfile
+    dockerContext: .
+    autoDeploy: false
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_HTTP_PORTS
+        value: "8080"
+      - key: ConnectionStrings__Default
+        sync: false
+      - key: Jwt__Issuer
+        value: PortfolioAnalytics
+      - key: Jwt__Audience
+        value: PortfolioAnalytics
+      - key: Jwt__SigningKey
+        sync: false
+      - key: AlphaVantage__ApiKey
+        sync: false
+      - key: Cors__AllowedOrigins__0
+        sync: false
+
+  - type: web
+    name: portfolio-analytics-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    autoDeploy: false
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
