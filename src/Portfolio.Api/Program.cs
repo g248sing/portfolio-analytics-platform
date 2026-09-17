@@ -4,6 +4,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Portfolio.Api.Filters;
@@ -90,10 +91,9 @@ builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
 builder.Services.AddScoped<IExportService, ExportService>();
 
 builder.Services.Configure<AlphaVantageOptions>(builder.Configuration.GetSection(AlphaVantageOptions.SectionName));
-var alphaVantageOptions = builder.Configuration.GetSection(AlphaVantageOptions.SectionName).Get<AlphaVantageOptions>()
-    ?? throw new InvalidOperationException("AlphaVantage configuration section is missing.");
-builder.Services.AddHttpClient<IMarketDataClient, AlphaVantageClient>(client =>
+builder.Services.AddHttpClient<IMarketDataClient, AlphaVantageClient>((serviceProvider, client) =>
 {
+    var alphaVantageOptions = serviceProvider.GetRequiredService<IOptions<AlphaVantageOptions>>().Value;
     client.BaseAddress = new Uri(alphaVantageOptions.BaseUrl);
 });
 builder.Services.AddScoped<PortfolioSnapshotService>();
@@ -109,14 +109,21 @@ builder.Services.AddQuartz(q =>
 });
 builder.Services.AddQuartzHostedService(opts => opts.WaitForJobsToComplete = true);
 
-var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
-    ?? throw new InvalidOperationException("Jwt configuration section is missing.");
-
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+    .AddJwtBearer();
+
+// Configured via IOptions<JwtOptions> (resolved lazily, once the DI container and
+// configuration are fully built) rather than reading builder.Configuration directly
+// here — that would snapshot values before configuration overrides (e.g. from
+// WebApplicationFactory in integration tests) are guaranteed to have been merged in,
+// and JwtTokenService signs tokens using the same lazily-resolved options, so an
+// eager mismatch here would silently sign and validate against different keys.
+builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+    .Configure<IOptions<JwtOptions>>((bearerOptions, jwtOptionsAccessor) =>
     {
-        options.TokenValidationParameters = new TokenValidationParameters
+        var jwtOptions = jwtOptionsAccessor.Value;
+        bearerOptions.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidIssuer = jwtOptions.Issuer,
@@ -176,3 +183,6 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Exposes the implicit Program class to WebApplicationFactory<Program> in integration tests.
+public partial class Program;
