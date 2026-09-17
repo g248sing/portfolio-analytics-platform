@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -9,9 +10,15 @@ using Portfolio.Api.Filters;
 using Portfolio.Api.Middleware;
 using Portfolio.Application.Auth;
 using Portfolio.Application.Auth.Validators;
+using Portfolio.Application.Holdings;
+using Portfolio.Application.Portfolios;
+using Portfolio.Application.Transactions;
 using Portfolio.Infrastructure.Auth;
+using Portfolio.Infrastructure.Holdings;
 using Portfolio.Infrastructure.Identity;
 using Portfolio.Infrastructure.Persistence;
+using Portfolio.Infrastructure.Portfolios;
+using Portfolio.Infrastructure.Transactions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +27,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers(options =>
 {
     options.Filters.Add<FluentValidationActionFilter>();
+}).AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -64,6 +74,10 @@ builder.Services
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.AddSingleton<ITokenService, JwtTokenService>();
+
+builder.Services.AddScoped<IPortfolioService, PortfolioService>();
+builder.Services.AddScoped<ITransactionService, TransactionService>();
+builder.Services.AddScoped<IHoldingsService, HoldingsService>();
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("Jwt configuration section is missing.");
