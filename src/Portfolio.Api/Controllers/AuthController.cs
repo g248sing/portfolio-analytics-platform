@@ -136,11 +136,20 @@ public class AuthController(
 
         await dbContext.SaveChangesAsync();
 
+        var isDevelopment = HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().IsDevelopment();
+
         Response.Cookies.Append(RefreshTokenCookieName, rawRefreshToken, new CookieOptions
         {
             HttpOnly = true,
-            Secure = !HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().IsDevelopment(),
-            SameSite = SameSiteMode.Strict,
+            Secure = !isDevelopment,
+            // Frontend and API are deployed on different subdomains of a shared-hosting
+            // domain (e.g. onrender.com), which browsers treat as genuinely different
+            // sites — a SameSite=Strict/Lax cookie set by the API is never sent back on
+            // the frontend's cross-site requests to it. SameSite=None (which requires
+            // Secure=true, hence only outside Development) is what actually works here;
+            // locally, different localhost ports still count as the same site, so Strict
+            // is fine and stronger there.
+            SameSite = isDevelopment ? SameSiteMode.Strict : SameSiteMode.None,
             Path = "/api/auth",
             Expires = refreshToken.ExpiresAt,
         });
